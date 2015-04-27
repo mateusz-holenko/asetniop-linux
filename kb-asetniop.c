@@ -8,6 +8,20 @@
 #include <linux/uinput.h>
 #include <ctype.h>
 
+#ifdef KEYS_EXTENSION
+  #define _STRINGIFY(x) #x
+  #define STRINGIFY(x) _STRINGIFY(\x)
+  
+  #define CODE_KEY_UP 0xFF
+  #define CODE_KEY_DOWN 0xFE
+  #define CODE_KEY_LEFT 0xFD
+  #define CODE_KEY_RIGHT 0xFC
+  #define CODE_KEY_HOME 0xFB
+  #define CODE_KEY_END 0xFA
+  #define CODE_KEY_PAGE_UP 0xF0
+  #define CODE_KEY_PAGE_DOWN 0xF9
+#endif
+
 #define ASETNIOP_A (1)
 #define ASETNIOP_S (1 << 1)
 #define ASETNIOP_E (1 << 2)
@@ -97,6 +111,18 @@ void init_symbols_mapping()
 
 void init_standard_mapping()
 {
+#ifdef KEYS_EXTENSION
+    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_N] = STRINGIFY(CODE_KEY_LEFT);
+    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_I] = STRINGIFY(CODE_KEY_DOWN);
+    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_O] = STRINGIFY(CODE_KEY_UP);
+    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_P] = STRINGIFY(CODE_KEY_RIGHT);
+
+    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_N] = STRINGIFY(CODE_KEY_HOME);
+    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_I] = STRINGIFY(CODE_KEY_PAGE_DOWN);
+    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_O] = STRINGIFY(CODE_KEY_PAGE_UP);
+    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_P] = STRINGIFY(CODE_KEY_END);
+#endif 
+
     // without shift
     mapping[ASETNIOP_A] = "a";
     mapping[ASETNIOP_S] = "s";
@@ -211,6 +237,17 @@ char* create_output_mapping2(char code1, char code2)
 
 void init_output_mapping()
 {
+#ifdef KEYS_EXTENSION
+  output_mapping[CODE_KEY_UP] = create_output_mapping(KEY_UP);
+  output_mapping[CODE_KEY_DOWN] = create_output_mapping(KEY_DOWN);
+  output_mapping[CODE_KEY_LEFT] = create_output_mapping(KEY_LEFT);
+  output_mapping[CODE_KEY_RIGHT] = create_output_mapping(KEY_RIGHT);
+  output_mapping[CODE_KEY_PAGE_UP] = create_output_mapping(KEY_PAGEUP);
+  output_mapping[CODE_KEY_PAGE_DOWN] = create_output_mapping(KEY_PAGEDOWN);
+  output_mapping[CODE_KEY_HOME] = create_output_mapping(KEY_HOME);
+  output_mapping[CODE_KEY_END] = create_output_mapping(KEY_END);
+#endif
+
   output_mapping['a'] = create_output_mapping(KEY_A);
   output_mapping['b'] = create_output_mapping(KEY_B);
   output_mapping['c'] = create_output_mapping(KEY_C);
