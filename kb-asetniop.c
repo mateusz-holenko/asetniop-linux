@@ -312,6 +312,27 @@ void init_output_mapping()
   output_mapping['8'] = create_output_mapping(KEY_8);
   output_mapping['9'] = create_output_mapping(KEY_9);
   output_mapping['0'] = create_output_mapping(KEY_0);
+
+  output_mapping['`'] = create_output_mapping(KEY_GRAVE);
+  output_mapping['~'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_GRAVE);
+
+  output_mapping['['] = create_output_mapping(KEY_LEFTBRACE);
+  output_mapping[']'] = create_output_mapping(KEY_RIGHTBRACE);
+
+  output_mapping['{'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_LEFTBRACE);
+  output_mapping['}'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_RIGHTBRACE);
+  output_mapping['='] = create_output_mapping(KEY_EQUAL);
+  output_mapping['+'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_EQUAL);
+  output_mapping['_'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_MINUS);
+  output_mapping[':'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_SEMICOLON);
+
+  output_mapping['@'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_2);
+  output_mapping['#'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_3);
+  output_mapping['$'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_4);
+  output_mapping['%'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_5);
+  output_mapping['^'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_6);
+  output_mapping['&'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_7);
+  output_mapping['*'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_8);
 }
 
 int open_input()
