@@ -555,8 +555,9 @@ int handle_key_press(int code)
     return EXIT_SUCCESS;
   }
 
-  if (code == KEY_LEFTMETA)
+  if (code == KEY_RIGHTMETA)
   {
+      printf("Detected exit key press, exiting.\n");
       return 1;
   }
 
