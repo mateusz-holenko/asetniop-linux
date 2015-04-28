@@ -8,6 +8,10 @@
 #include <linux/uinput.h>
 #include <ctype.h>
 
+#define NOT_SET 0
+#define USED 1
+#define SET 2
+
 #define KEYS_EXTENSION
 
 #ifdef KEYS_EXTENSION
@@ -463,10 +467,6 @@ void generate_key_event(int code, int type)
 void generate_key_press(int code)
 {
   printf("Generating key press event for key: %d\n", code);
-  if (sticky_shift)
-  {
-      generate_key_event(KEY_LEFTSHIFT, 1);
-  }
   generate_key_event(code, 1);
 }
 
@@ -474,11 +474,6 @@ void generate_key_release(int code)
 {
   printf("Generating key release event for key: %d\n", code);
   generate_key_event(code, 0);
-  if (sticky_shift)
-  {
-      generate_key_event(KEY_LEFTSHIFT, 0);
-      sticky_shift = 0;
-  }
 }
 
 void generate_sync_event()
@@ -567,6 +562,24 @@ int handle_key_press(int code)
     printf("Non-asetniop key pressed, ignoring...\n");
     return 0;
   }
+  else if (key == ASETNIOP_SHIFT)
+  {
+    if (state == 0)
+    {
+      printf("Sticky shift set\n");
+      sticky_shift = SET;
+      return EXIT_SUCCESS;
+    }
+  }
+  else
+  {
+    if (sticky_shift == SET)
+    {
+      printf("Using sticky shift modifier and reseting\n");
+      state |= ASETNIOP_SHIFT;
+      sticky_shift = USED;
+    }
+  }
 
   state |= key;
   if (state == (ASETNIOP_A | ASETNIOP_T | ASETNIOP_N | ASETNIOP_P))
@@ -646,25 +659,16 @@ void handle_key_release(int code)
   }
 
   int key = key_to_asetniop(code);
-  if (key == ASETNIOP_SHIFT && state == ASETNIOP_SHIFT)
-  {
-      if (sticky_shift)
-      {
-          generate_key_press(KEY_CAPSLOCK);
-          generate_key_release(KEY_CAPSLOCK);
-          generate_sync_event();
-          sticky_shift = 0;
-      }
-      else
-      {
-          sticky_shift = 1;
-      }
-  }
-
   if (key != -1)
   {
       state &= (~key);
   }
+ 
+  if (sticky_shift == USED)
+  { 
+    sticky_shift = NOT_SET;
+    state &= ~ASETNIOP_SHIFT;
+  } 
 
   printf("State after releasing key is: %d\n", state);
   mask = 0;
