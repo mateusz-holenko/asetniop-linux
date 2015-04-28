@@ -560,7 +560,7 @@ int handle_key_press(int code)
     return EXIT_SUCCESS;
   }
 
-  if (code == KEY_RIGHTMETA)
+  if (code == KEY_RIGHTMETA || code == KEY_BACKSPACE)
   {
       printf("Detected exit key press, exiting.\n");
       return 1;
