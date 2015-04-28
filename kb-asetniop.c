@@ -54,6 +54,8 @@ char* output_mapping[256];
 unsigned int state = 0;
 unsigned int mask  = 0;
 
+int sticky_shift = 0;
+
 int output_descriptor;
 int input_descriptor;
 
@@ -445,6 +447,10 @@ void generate_key_event(int code, int type)
 void generate_key_press(int code)
 {
   printf("Generating key press event for key: %d\n", code);
+  if (sticky_shift)
+  {
+      generate_key_event(KEY_LEFTSHIFT, 1);
+  }
   generate_key_event(code, 1);
 }
 
@@ -452,6 +458,11 @@ void generate_key_release(int code)
 {
   printf("Generating key release event for key: %d\n", code);
   generate_key_event(code, 0);
+  if (sticky_shift)
+  {
+      generate_key_event(KEY_LEFTSHIFT, 0);
+      sticky_shift = 0;
+  }
 }
 
 void generate_sync_event()
@@ -590,6 +601,21 @@ void handle_key_release(int code)
   }
 
   int key = key_to_asetniop(code);
+  if (key == ASETNIOP_SHIFT && state == ASETNIOP_SHIFT)
+  {
+      if (sticky_shift)
+      {
+          generate_key_press(KEY_CAPSLOCK);
+          generate_key_release(KEY_CAPSLOCK);
+          generate_sync_event();
+          sticky_shift = 0;
+      }
+      else
+      {
+          sticky_shift = 1;
+      }
+  }
+
   if (key != -1)
   {
       state &= (~key);
