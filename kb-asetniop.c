@@ -127,6 +127,9 @@ void init_standard_mapping()
     mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_I] = STRINGIFY(CODE_KEY_PAGE_DOWN);
     mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_O] = STRINGIFY(CODE_KEY_PAGE_UP);
     mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_P] = STRINGIFY(CODE_KEY_END);
+
+    mapping[ASETNIOP_S | ASETNIOP_E | ASETNIOP_T] = "\t";
+    mapping[ASETNIOP_A | ASETNIOP_S | ASETNIOP_E] = "\x1B"; // esc
 #endif 
 
     // without shift
@@ -252,6 +255,9 @@ void init_output_mapping()
   output_mapping[HEXIFY(CODE_KEY_PAGE_DOWN)] = create_output_mapping(KEY_PAGEDOWN);
   output_mapping[HEXIFY(CODE_KEY_HOME)] = create_output_mapping(KEY_HOME);
   output_mapping[HEXIFY(CODE_KEY_END)] = create_output_mapping(KEY_END);
+
+  output_mapping['\t'] = create_output_mapping(KEY_TAB);
+  output_mapping['\x1b'] = create_output_mapping(KEY_ESC);
 #endif
 
   output_mapping['a'] = create_output_mapping(KEY_A);
