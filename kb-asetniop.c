@@ -73,60 +73,73 @@ int input_descriptor;
 
 void init_symbols_mapping()
 {
-    symbols_mapping[ASETNIOP_A] = "1";
-    symbols_mapping[ASETNIOP_S] = "2";
-    symbols_mapping[ASETNIOP_E] = "3";
-    symbols_mapping[ASETNIOP_T] = "4";
-    symbols_mapping[ASETNIOP_SHIFT] = "5";
-    symbols_mapping[ASETNIOP_SPACE] = "6";
-    symbols_mapping[ASETNIOP_N] = "7";
-    symbols_mapping[ASETNIOP_I] = "8";
-    symbols_mapping[ASETNIOP_O] = "9";
-    symbols_mapping[ASETNIOP_P] = "0";
+    symbols_mapping[                 ASETNIOP_SPACE] = " ";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_SPACE] = "\n";
 
-    // mapping[ASETNIOP_A | ASETNIOP_S] = "`";
-    symbols_mapping[ASETNIOP_A | ASETNIOP_E] = "`";
-    symbols_mapping[ASETNIOP_A | ASETNIOP_T] = "{";
-    // mapping[ASETNIOP_A | ASETNIOP_N] = "q";
-    symbols_mapping[ASETNIOP_A | ASETNIOP_I] = "!";
-    symbols_mapping[ASETNIOP_A | ASETNIOP_O] = "(";
-    symbols_mapping[ASETNIOP_A | ASETNIOP_P] = "?";
-
-    symbols_mapping[ASETNIOP_S | ASETNIOP_E] = "-";
-    // mapping[ASETNIOP_S | ASETNIOP_T] = "c";
-    // mapping[ASETNIOP_S | ASETNIOP_N] = "j"; // end
-    symbols_mapping[ASETNIOP_S | ASETNIOP_I] = "=";
-    symbols_mapping[ASETNIOP_S | ASETNIOP_O] = ".";
-    symbols_mapping[ASETNIOP_S | ASETNIOP_P] = ")";
-
-    // mapping[ASETNIOP_E | ASETNIOP_T] = "r"; // page_up
-    // mapping[ASETNIOP_E | ASETNIOP_N] = "y"; // home
-    symbols_mapping[ASETNIOP_E | ASETNIOP_I] = ",";
-    symbols_mapping[ASETNIOP_E | ASETNIOP_O] = "-";
-    symbols_mapping[ASETNIOP_E | ASETNIOP_P] = "'";
-
-    // mapping[ASETNIOP_T | ASETNIOP_N] = "b"; // key left
-    // mapping[ASETNIOP_T | ASETNIOP_I] = "v"; // key up ?!
-    // mapping[ASETNIOP_T | ASETNIOP_O] = "g"; // key right ?!
-    symbols_mapping[ASETNIOP_T | ASETNIOP_P] = "\x08"; // backspace
-
-    // mapping[ASETNIOP_N | ASETNIOP_I] = "h"; // page down
-    // mapping[ASETNIOP_N | ASETNIOP_O] = "u"; // function
-    symbols_mapping[ASETNIOP_N | ASETNIOP_P] = "]";
-    symbols_mapping[ASETNIOP_I | ASETNIOP_O] = "=";
-    symbols_mapping[ASETNIOP_I | ASETNIOP_P] = "\\";
-    symbols_mapping[ASETNIOP_O | ASETNIOP_P] = ";";
-
+    symbols_mapping[                 ASETNIOP_A] = "1";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A] = "!";
+    symbols_mapping[                 ASETNIOP_S] = "2";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S] = "@";
+    symbols_mapping[                 ASETNIOP_E] = "3";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E] = "#";
+    symbols_mapping[                 ASETNIOP_T] = "4";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_T] = "$";
-    // symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_SHIFT] = "%";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_SPACE] = "^";
+    symbols_mapping[                 ASETNIOP_E | ASETNIOP_T] = "5"; // this is different than ASETNIOP layout
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_T] = "%"; // this is different than ASETNIOP layout
+    symbols_mapping[                 ASETNIOP_N | ASETNIOP_I] = "6"; // this is different than ASETNIOP layout
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_I] = "^"; // this is different than ASETNIOP layout
+    symbols_mapping[                 ASETNIOP_N] = "7";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_N] = "&";
+    symbols_mapping[                 ASETNIOP_I] = "8";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_I] = "*";
+    symbols_mapping[                 ASETNIOP_O] = "9";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_O] = "(";
+    symbols_mapping[                 ASETNIOP_P] = "0";
     symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_P] = ")";
+
+    symbols_mapping[                 ASETNIOP_A | ASETNIOP_E] = "`";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_E] = "~";
+
+    symbols_mapping[                 ASETNIOP_A | ASETNIOP_T] = "[";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_T] = "{";
+
+    symbols_mapping[                 ASETNIOP_S | ASETNIOP_E] = "=="; // this is different than ASETNIOP layout
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_E] = "!="; // this is different than ASETNIOP layout
+
+    symbols_mapping[                 ASETNIOP_E | ASETNIOP_O] = "-";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_O] = "_";
+
+    symbols_mapping[                 ASETNIOP_A | ASETNIOP_P] = "?";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_P] = "/";
+
+    symbols_mapping[                 ASETNIOP_S | ASETNIOP_I] = "=";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_I] = "+";
+
+    symbols_mapping[                 ASETNIOP_S | ASETNIOP_O] = ".";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_O] = ">";
+
+    symbols_mapping[                 ASETNIOP_E | ASETNIOP_I] = ",";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_I] = "<";
+    
+    symbols_mapping[                 ASETNIOP_E | ASETNIOP_P] = "'";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_P] = "\"";
+
+    symbols_mapping[                 ASETNIOP_N | ASETNIOP_P] = "]";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_P] = "}";
+
+    symbols_mapping[                 ASETNIOP_I | ASETNIOP_O] = "=";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_I | ASETNIOP_O] = "+";
+
+    symbols_mapping[                 ASETNIOP_I | ASETNIOP_P] = "\\";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_I | ASETNIOP_P] = "|";
+
+    symbols_mapping[                 ASETNIOP_O | ASETNIOP_P] = ";";
+    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_O | ASETNIOP_P] = ":";
+
+    symbols_mapping[ASETNIOP_A | ASETNIOP_I] = "!"; // there are no shift mappings 
+    symbols_mapping[ASETNIOP_A | ASETNIOP_O] = "(";
+    symbols_mapping[ASETNIOP_S | ASETNIOP_P] = ")";
+    symbols_mapping[ASETNIOP_T | ASETNIOP_P] = "\x08"; // backspace
 }
 
 void init_standard_mapping()
