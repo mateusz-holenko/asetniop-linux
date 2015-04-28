@@ -12,6 +12,7 @@
 #define USED 1
 #define SET 2
 
+#define ALT_EXTENSION
 #define KEYS_EXTENSION
 
 #ifdef KEYS_EXTENSION
@@ -47,6 +48,9 @@
 
 const char* input_dev = "/dev/input/by-path/pci-0000:00:1a.0-usb-0:1.6:1.0-event-kbd";
 // const char* input_dev = "/dev/input/by-path/platform-i8042-serio-0-event-kbd";
+#ifdef ALT_EXTENSION
+  #define ASETNIOP_ALT (1 << 10)
+#endif
 const char* output_dev = "/dev/uinput";
 
 char** current_mapping;
@@ -59,6 +63,9 @@ unsigned int state = 0;
 unsigned int mask  = 0;
 
 int sticky_shift = 0;
+#ifdef ALT_EXTENSION
+int sticky_alt = 0;
+#endif
 int operational_mode = 1;
 
 int output_descriptor;
@@ -524,17 +531,20 @@ int key_to_asetniop(int code)
       return ASETNIOP_P;
     case KEY_SPACE:
       return ASETNIOP_SPACE;
+    case KEY_LEFTALT:
     case KEY_Z:
     case KEY_X:
     case KEY_C:
     case KEY_V:
-    case KEY_B:
+#ifdef ALT_EXTENSION
+      return ASETNIOP_ALT;
+#endif
     case KEY_N:
     case KEY_M:
     case KEY_COMMA:
     case KEY_DOT:
     case KEY_SLASH:
-    case KEY_LEFTALT:
+    case KEY_RIGHTALT:
       return ASETNIOP_SHIFT;
   }
 
@@ -571,14 +581,32 @@ int handle_key_press(int code)
       return EXIT_SUCCESS;
     }
   }
+#ifdef ALT_EXTENSION
+  else if (key == ASETNIOP_ALT)
+  {
+    if (state == 0)
+    {
+      printf("Sticky alt set\n");
+      sticky_alt = SET;
+      return EXIT_SUCCESS;
+    }
+  }
+#endif
   else
   {
     if (sticky_shift == SET)
     {
-      printf("Using sticky shift modifier and reseting\n");
+      printf("Using sticky shift modifier and reseting it\n");
       state |= ASETNIOP_SHIFT;
       sticky_shift = USED;
     }
+#ifdef ALT_EXTENSION
+    if (sticky_alt == SET)
+    {
+      printf("Using sticky alt modifier and resetting it\n");
+      sticky_alt = USED;
+    }
+#endif
   }
 
   state |= key;
@@ -607,7 +635,20 @@ int handle_key_press(int code)
 
 void generate_chord()
 {
-  char* m = current_mapping[state & mask];
+  char* m;
+#ifdef ALT_EXTENSION
+  if (sticky_alt == USED)
+  {
+    sticky_alt = NOT_SET;
+    m = symbols_mapping[state & mask];
+  }
+  else
+  {
+    m = current_mapping[state & mask];
+  }
+#else
+  m = current_mapping[state & mask];
+#endif
   if (m == 0)
   {
       printf("Unknown mapping, ignoring...\n");
