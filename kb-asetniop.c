@@ -55,6 +55,7 @@ unsigned int state = 0;
 unsigned int mask  = 0;
 
 int sticky_shift = 0;
+int operational_mode = 1;
 
 int output_descriptor;
 int input_descriptor;
@@ -349,6 +350,28 @@ void init_output_mapping()
   output_mapping['*'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_8);
 }
 
+static int change_grab(long operation)
+{
+    int result = ioctl(input_descriptor, EVIOCGRAB, (void*)operation);
+    if (result == -1)
+    {
+        printf("Couldn't %s input from device %s: %s\n", operation ? "grab" : "ungrab", input_dev, strerror(errno));
+        return EXIT_FAILURE;
+    }
+    printf("Input %s successfully\n", operation ? "grabbed" : "ungrabbed");
+    return EXIT_SUCCESS;
+}
+
+int grab_input()
+{
+    return change_grab(1);
+}
+
+int release_input()
+{
+    return change_grab(0);
+}
+
 int open_input()
 {
     input_descriptor = open(input_dev, O_RDONLY);
@@ -358,14 +381,7 @@ int open_input()
         return EXIT_FAILURE;
     }
 
-    int result = ioctl(input_descriptor, EVIOCGRAB, (void*)1);
-    if (result == -1)
-    {
-        printf("Couldn't grab input from device %s: %s\n", input_dev, strerror(errno));
-        return EXIT_FAILURE;
-    }
-    
-    return EXIT_SUCCESS;
+    return grab_input();
 }
 
 int open_output()
@@ -533,10 +549,22 @@ int key_to_asetniop(int code)
 int handle_key_press(int code)
 {
   printf("Key Pressed: %d, current state is: %d\n", code, state);
+  if (!operational_mode)
+  {
+    printf("Not in operational mode, ignoring...\n");
+    return EXIT_SUCCESS;
+  }
+
+  if (code == KEY_LEFTMETA)
+  {
+      return 1;
+  }
+
   int key = key_to_asetniop(code);
   if (key == -1)
   {
-    return 1;
+    printf("Non-asetniop key pressed, ignoring...\n");
+    return 0;
   }
 
   state |= key;
@@ -595,6 +623,22 @@ void generate_chord()
 void handle_key_release(int code)
 {
   printf("Key Released: %d\n", code);
+  if (code == KEY_SCROLLLOCK)
+  {
+      operational_mode = 1 - operational_mode;
+      state = 0;
+      mask = 0;
+      if (operational_mode)
+      {
+          grab_input();
+      }
+      else
+      {
+          release_input();
+      }
+      return;
+  }
+
   if ((state & mask) != 0)
   {
     generate_chord();
