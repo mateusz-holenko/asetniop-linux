@@ -8,18 +8,24 @@
 #include <linux/uinput.h>
 #include <ctype.h>
 
+#define KEYS_EXTENSION
+
 #ifdef KEYS_EXTENSION
-  #define _STRINGIFY(x) #x
-  #define STRINGIFY(x) _STRINGIFY(\x)
+  #define __STRINGIFY(y) #y
+  #define _STRINGIFY(y) __STRINGIFY(\x##y)
+  #define STRINGIFY(y) _STRINGIFY(y)
+
+  #define _HEXIFY(y) 0x##y 
+  #define HEXIFY(y) _HEXIFY(y) 
   
-  #define CODE_KEY_UP 0xFF
-  #define CODE_KEY_DOWN 0xFE
-  #define CODE_KEY_LEFT 0xFD
-  #define CODE_KEY_RIGHT 0xFC
-  #define CODE_KEY_HOME 0xFB
-  #define CODE_KEY_END 0xFA
-  #define CODE_KEY_PAGE_UP 0xF0
-  #define CODE_KEY_PAGE_DOWN 0xF9
+  #define CODE_KEY_UP 01
+  #define CODE_KEY_DOWN 02
+  #define CODE_KEY_LEFT 03
+  #define CODE_KEY_RIGHT 04
+  #define CODE_KEY_HOME 05  
+  #define CODE_KEY_END 06
+  #define CODE_KEY_PAGE_UP 07
+  #define CODE_KEY_PAGE_DOWN 0C
 #endif
 
 #define ASETNIOP_A (1)
@@ -238,14 +244,14 @@ char* create_output_mapping2(char code1, char code2)
 void init_output_mapping()
 {
 #ifdef KEYS_EXTENSION
-  output_mapping[CODE_KEY_UP] = create_output_mapping(KEY_UP);
-  output_mapping[CODE_KEY_DOWN] = create_output_mapping(KEY_DOWN);
-  output_mapping[CODE_KEY_LEFT] = create_output_mapping(KEY_LEFT);
-  output_mapping[CODE_KEY_RIGHT] = create_output_mapping(KEY_RIGHT);
-  output_mapping[CODE_KEY_PAGE_UP] = create_output_mapping(KEY_PAGEUP);
-  output_mapping[CODE_KEY_PAGE_DOWN] = create_output_mapping(KEY_PAGEDOWN);
-  output_mapping[CODE_KEY_HOME] = create_output_mapping(KEY_HOME);
-  output_mapping[CODE_KEY_END] = create_output_mapping(KEY_END);
+  output_mapping[HEXIFY(CODE_KEY_UP)] = create_output_mapping(KEY_UP);
+  output_mapping[HEXIFY(CODE_KEY_DOWN)] = create_output_mapping(KEY_DOWN);
+  output_mapping[HEXIFY(CODE_KEY_LEFT)] = create_output_mapping(KEY_LEFT);
+  output_mapping[HEXIFY(CODE_KEY_RIGHT)] = create_output_mapping(KEY_RIGHT);
+  output_mapping[HEXIFY(CODE_KEY_PAGE_UP)] = create_output_mapping(KEY_PAGEUP);
+  output_mapping[HEXIFY(CODE_KEY_PAGE_DOWN)] = create_output_mapping(KEY_PAGEDOWN);
+  output_mapping[HEXIFY(CODE_KEY_HOME)] = create_output_mapping(KEY_HOME);
+  output_mapping[HEXIFY(CODE_KEY_END)] = create_output_mapping(KEY_END);
 #endif
 
   output_mapping['a'] = create_output_mapping(KEY_A);
