@@ -14,6 +14,7 @@
 
 #define ALT_EXTENSION
 #define KEYS_EXTENSION
+#define PL_EXTENSION
 
 #ifdef KEYS_EXTENSION
   #define __STRINGIFY(y) #y
@@ -31,6 +32,18 @@
   #define CODE_KEY_END 06
   #define CODE_KEY_PAGE_UP 07
   #define CODE_KEY_PAGE_DOWN 0C
+#endif
+
+#ifdef PL_EXTENSION
+  #define CODE_KEY_PL_A 10
+  #define CODE_KEY_PL_C 11
+  #define CODE_KEY_PL_E 12
+  #define CODE_KEY_PL_L 13
+  #define CODE_KEY_PL_N 14
+  #define CODE_KEY_PL_O 15
+  #define CODE_KEY_PL_S 16
+  #define CODE_KEY_PL_X 17
+  #define CODE_KEY_PL_Z 18
 #endif
 
 #define ASETNIOP_A (1)
@@ -159,6 +172,18 @@ void init_standard_mapping()
     mapping[ASETNIOP_A | ASETNIOP_S | ASETNIOP_E] = "\x1B"; // esc
 #endif 
 
+#ifdef PL_EXTENSION
+    mapping[ASETNIOP_SPACE | ASETNIOP_A] = STRINGIFY(CODE_KEY_PL_A);
+    mapping[ASETNIOP_SPACE | ASETNIOP_S | ASETNIOP_T] = STRINGIFY(CODE_KEY_PL_C);
+    mapping[ASETNIOP_SPACE | ASETNIOP_E] = STRINGIFY(CODE_KEY_PL_E);
+    mapping[ASETNIOP_SPACE | ASETNIOP_I | ASETNIOP_O] = STRINGIFY(CODE_KEY_PL_L);
+    mapping[ASETNIOP_SPACE | ASETNIOP_N] = STRINGIFY(CODE_KEY_PL_N);
+    mapping[ASETNIOP_SPACE | ASETNIOP_O] = STRINGIFY(CODE_KEY_PL_O);
+    mapping[ASETNIOP_SPACE | ASETNIOP_S] = STRINGIFY(CODE_KEY_PL_S);
+    mapping[ASETNIOP_SPACE | ASETNIOP_A | ASETNIOP_E] = STRINGIFY(CODE_KEY_PL_X);
+    mapping[ASETNIOP_SPACE | ASETNIOP_S | ASETNIOP_I] = STRINGIFY(CODE_KEY_PL_Z);
+#endif
+
     // without shift
     mapping[ASETNIOP_A] = "a";
     mapping[ASETNIOP_S] = "s";
@@ -285,6 +310,18 @@ void init_output_mapping()
 
   output_mapping['\t'] = create_output_mapping(KEY_TAB);
   output_mapping['\x1b'] = create_output_mapping(KEY_ESC);
+#endif
+
+#ifdef PL_EXTENSION
+  output_mapping[HEXIFY(CODE_KEY_PL_A)] = create_output_mapping2(KEY_RIGHTALT, KEY_A);
+  output_mapping[HEXIFY(CODE_KEY_PL_C)] = create_output_mapping2(KEY_RIGHTALT, KEY_C);
+  output_mapping[HEXIFY(CODE_KEY_PL_E)] = create_output_mapping2(KEY_RIGHTALT, KEY_E);
+  output_mapping[HEXIFY(CODE_KEY_PL_L)] = create_output_mapping2(KEY_RIGHTALT, KEY_L);
+  output_mapping[HEXIFY(CODE_KEY_PL_N)] = create_output_mapping2(KEY_RIGHTALT, KEY_N);
+  output_mapping[HEXIFY(CODE_KEY_PL_O)] = create_output_mapping2(KEY_RIGHTALT, KEY_O);
+  output_mapping[HEXIFY(CODE_KEY_PL_S)] = create_output_mapping2(KEY_RIGHTALT, KEY_S);
+  output_mapping[HEXIFY(CODE_KEY_PL_X)] = create_output_mapping2(KEY_RIGHTALT, KEY_X);
+  output_mapping[HEXIFY(CODE_KEY_PL_Z)] = create_output_mapping2(KEY_RIGHTALT, KEY_Z);
 #endif
 
   output_mapping['a'] = create_output_mapping(KEY_A);
