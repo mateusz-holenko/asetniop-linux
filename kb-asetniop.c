@@ -8,59 +8,35 @@
 #include <linux/uinput.h>
 #include <ctype.h>
 
+#define MAX_PRESSED_KEYS 10
+#define MAX_KEY_CODE 255
+#define NO_MAPPING -1
+
 #define NOT_SET 0
 #define USED 1
 #define SET 2
 
-#define ALT_EXTENSION
-#define KEYS_EXTENSION
-#define PL_EXTENSION
+#define __STRINGIFY(y) #y
 
-#ifdef KEYS_EXTENSION
-  #define __STRINGIFY(y) #y
-  #define _STRINGIFY(y) __STRINGIFY(\x##y)
-  #define STRINGIFY(y) _STRINGIFY(y)
+#define _STRINGIFY(y) __STRINGIFY(\x##y)
+#define STRINGIFY(y) _STRINGIFY(y)
 
-  #define _HEXIFY(y) 0x##y 
-  #define HEXIFY(y) _HEXIFY(y) 
-  
-  #define CODE_KEY_UP 01
-  #define CODE_KEY_DOWN 02
-  #define CODE_KEY_LEFT 03
-  #define CODE_KEY_RIGHT 04
-  #define CODE_KEY_HOME 05  
-  #define CODE_KEY_END 06
-  #define CODE_KEY_PAGE_UP 07
-  #define CODE_KEY_PAGE_DOWN 0C
-#endif
+#define _HEXIFY(y) 0x##y 
+#define HEXIFY(y) _HEXIFY(y) 
 
-#ifdef PL_EXTENSION
-  #define CODE_KEY_PL_A 10
-  #define CODE_KEY_PL_C 11
-  #define CODE_KEY_PL_E 12
-  #define CODE_KEY_PL_L 13
-  #define CODE_KEY_PL_N 14
-  #define CODE_KEY_PL_O 15
-  #define CODE_KEY_PL_S 16
-  #define CODE_KEY_PL_X 17
-  #define CODE_KEY_PL_Z 18
-#endif
+#define MODE_PASSTHROUGH 147
+#define MODE_NORMAL 100
 
-#define ASETNIOP_A (1)
-#define ASETNIOP_S (1 << 1)
-#define ASETNIOP_E (1 << 2)
-#define ASETNIOP_T (1 << 3)
+#define TRUE 1
+#define FALSE 0
 
-#define ASETNIOP_N (1 << 4)
-#define ASETNIOP_I (1 << 5)
-#define ASETNIOP_O (1 << 6)
-#define ASETNIOP_P (1 << 7)
+#define LEADER_PRESSED 999
 
-#define ASETNIOP_SHIFT (1 << 8)
-#define ASETNIOP_SPACE (1 << 9)
+#define KEY_SHIFT_MASK (1<<25)
+#define KEY_CTRL_MASK (1<<26)
 
-const char* input_dev = "/dev/input/by-path/pci-0000:00:1a.0-usb-0:1.6:1.0-event-kbd";
-// const char* input_dev = "/dev/input/by-path/platform-i8042-serio-0-event-kbd";
+// const char* input_dev = "/dev/input/by-path/pci-0000:00:1a.0-usb-0:1.6:1.0-event-kbd";
+const char* input_dev = "/dev/input/by-path/platform-i8042-serio-0-event-kbd";
 #ifdef ALT_EXTENSION
   #define ASETNIOP_ALT (1 << 10)
 #endif
@@ -68,12 +44,23 @@ const char* output_dev = "/dev/uinput";
 
 char** current_mapping;
 
+int default_layer[MAX_KEY_CODE + 1];
+int numbers_layer[MAX_KEY_CODE + 1];
+
 char* mapping[2048];
 char* symbols_mapping[2048];
 char* output_mapping[256];
 
 unsigned int state = 0;
 unsigned int mask  = 0;
+
+unsigned int pressed_keys_count = 0;
+unsigned int pressed_keys[MAX_PRESSED_KEYS];
+
+int mode;
+int space_pressed = FALSE;
+int capslock_pressed = FALSE;
+int chord_generated;
 
 int sticky_shift = 0;
 #ifdef ALT_EXTENSION
@@ -84,197 +71,63 @@ int operational_mode = 1;
 int output_descriptor;
 int input_descriptor;
 
-void init_symbols_mapping()
-{
-    symbols_mapping[                 ASETNIOP_SPACE] = " ";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_SPACE] = "\n";
+#define warning(...)
+#define noisy(...)
+#define info printf
+#define error printf
 
-    symbols_mapping[                 ASETNIOP_A] = "1";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A] = "!";
-    symbols_mapping[                 ASETNIOP_S] = "2";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S] = "@";
-    symbols_mapping[                 ASETNIOP_E] = "3";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E] = "#";
-    symbols_mapping[                 ASETNIOP_T] = "4";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_T] = "$";
-    symbols_mapping[                 ASETNIOP_E | ASETNIOP_T] = "5"; // this is different than ASETNIOP layout
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_T] = "%"; // this is different than ASETNIOP layout
-    symbols_mapping[                 ASETNIOP_N | ASETNIOP_I] = "6"; // this is different than ASETNIOP layout
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_I] = "^"; // this is different than ASETNIOP layout
-    symbols_mapping[                 ASETNIOP_N] = "7";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_N] = "&";
-    symbols_mapping[                 ASETNIOP_I] = "8";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_I] = "*";
-    symbols_mapping[                 ASETNIOP_O] = "9";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_O] = "(";
-    symbols_mapping[                 ASETNIOP_P] = "0";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_P] = ")";
+// #define DEBUG_LOG
 
-    symbols_mapping[                 ASETNIOP_A | ASETNIOP_E] = "`";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_E] = "~";
-
-    symbols_mapping[                 ASETNIOP_A | ASETNIOP_T] = "[";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_T] = "{";
-
-    symbols_mapping[                 ASETNIOP_S | ASETNIOP_E] = "=="; // this is different than ASETNIOP layout
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_E] = "!="; // this is different than ASETNIOP layout
-
-    symbols_mapping[                 ASETNIOP_E | ASETNIOP_O] = "-";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_O] = "_";
-
-    symbols_mapping[                 ASETNIOP_A | ASETNIOP_P] = "?";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_P] = "/";
-
-    symbols_mapping[                 ASETNIOP_S | ASETNIOP_I] = "=";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_I] = "+";
-
-    symbols_mapping[                 ASETNIOP_S | ASETNIOP_O] = ".";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_O] = ">";
-
-    symbols_mapping[                 ASETNIOP_E | ASETNIOP_I] = ",";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_I] = "<";
-    
-    symbols_mapping[                 ASETNIOP_E | ASETNIOP_P] = "'";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_P] = "\"";
-
-    symbols_mapping[                 ASETNIOP_N | ASETNIOP_P] = "]";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_P] = "}";
-
-    symbols_mapping[                 ASETNIOP_I | ASETNIOP_O] = "=";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_I | ASETNIOP_O] = "+";
-
-    symbols_mapping[                 ASETNIOP_I | ASETNIOP_P] = "\\";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_I | ASETNIOP_P] = "|";
-
-    symbols_mapping[                 ASETNIOP_O | ASETNIOP_P] = ";";
-    symbols_mapping[ASETNIOP_SHIFT | ASETNIOP_O | ASETNIOP_P] = ":";
-
-    symbols_mapping[ASETNIOP_A | ASETNIOP_I] = "!"; // there are no shift mappings 
-    symbols_mapping[ASETNIOP_A | ASETNIOP_O] = "(";
-    symbols_mapping[ASETNIOP_S | ASETNIOP_P] = ")";
-    symbols_mapping[ASETNIOP_T | ASETNIOP_P] = "\x08"; // backspace
-}
-
-void init_standard_mapping()
-{
-#ifdef KEYS_EXTENSION
-    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_N] = STRINGIFY(CODE_KEY_LEFT);
-    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_I] = STRINGIFY(CODE_KEY_DOWN);
-    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_O] = STRINGIFY(CODE_KEY_UP);
-    mapping[ASETNIOP_E | ASETNIOP_T | ASETNIOP_P] = STRINGIFY(CODE_KEY_RIGHT);
-
-    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_N] = STRINGIFY(CODE_KEY_HOME);
-    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_I] = STRINGIFY(CODE_KEY_PAGE_DOWN);
-    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_O] = STRINGIFY(CODE_KEY_PAGE_UP);
-    mapping[ASETNIOP_S | ASETNIOP_T | ASETNIOP_P] = STRINGIFY(CODE_KEY_END);
-
-    mapping[ASETNIOP_S | ASETNIOP_E | ASETNIOP_T] = "\t";
-    mapping[ASETNIOP_A | ASETNIOP_S | ASETNIOP_E] = "\x1B"; // esc
-#endif 
-
-#ifdef PL_EXTENSION
-    mapping[ASETNIOP_SPACE | ASETNIOP_A] = STRINGIFY(CODE_KEY_PL_A);
-    mapping[ASETNIOP_SPACE | ASETNIOP_S | ASETNIOP_T] = STRINGIFY(CODE_KEY_PL_C);
-    mapping[ASETNIOP_SPACE | ASETNIOP_E] = STRINGIFY(CODE_KEY_PL_E);
-    mapping[ASETNIOP_SPACE | ASETNIOP_I | ASETNIOP_O] = STRINGIFY(CODE_KEY_PL_L);
-    mapping[ASETNIOP_SPACE | ASETNIOP_N] = STRINGIFY(CODE_KEY_PL_N);
-    mapping[ASETNIOP_SPACE | ASETNIOP_O] = STRINGIFY(CODE_KEY_PL_O);
-    mapping[ASETNIOP_SPACE | ASETNIOP_S] = STRINGIFY(CODE_KEY_PL_S);
-    mapping[ASETNIOP_SPACE | ASETNIOP_A | ASETNIOP_E] = STRINGIFY(CODE_KEY_PL_X);
-    mapping[ASETNIOP_SPACE | ASETNIOP_S | ASETNIOP_I] = STRINGIFY(CODE_KEY_PL_Z);
+#ifdef DEBUG_LOG
+#define debug printf
+#else
+#define debug(...)
 #endif
 
-    // without shift
-    mapping[ASETNIOP_A] = "a";
-    mapping[ASETNIOP_S] = "s";
-    mapping[ASETNIOP_E] = "e";
-    mapping[ASETNIOP_T] = "t";
-    mapping[ASETNIOP_N] = "n";
-    mapping[ASETNIOP_I] = "i";
-    mapping[ASETNIOP_O] = "o";
-    mapping[ASETNIOP_P] = "p";
-    mapping[ASETNIOP_SPACE] = " ";
+void define_chord2(int code1, int code2)
+{
+}
 
-    mapping[ASETNIOP_A | ASETNIOP_S] = "w";
-    mapping[ASETNIOP_A | ASETNIOP_E] = "x";
-    mapping[ASETNIOP_A | ASETNIOP_T] = "f";
-    mapping[ASETNIOP_A | ASETNIOP_N] = "q";
-    mapping[ASETNIOP_A | ASETNIOP_I] = "!";
-    mapping[ASETNIOP_A | ASETNIOP_O] = "(";
-    mapping[ASETNIOP_A | ASETNIOP_P] = "?";
+void define_chord3(int code1, int code2, int code3)
+{
+}
 
-    mapping[ASETNIOP_S | ASETNIOP_E] = "d";
-    mapping[ASETNIOP_S | ASETNIOP_T] = "c";
-    mapping[ASETNIOP_S | ASETNIOP_N] = "j";
-    mapping[ASETNIOP_S | ASETNIOP_I] = "z";
-    mapping[ASETNIOP_S | ASETNIOP_O] = ".";
-    mapping[ASETNIOP_S | ASETNIOP_P] = ")";
+void init_default_layer()
+{
+    for(int i = 0; i <= MAX_KEY_CODE; i++)
+    {
+        default_layer[i] = i;
+    }
+}
 
-    mapping[ASETNIOP_E | ASETNIOP_T] = "r";
-    mapping[ASETNIOP_E | ASETNIOP_N] = "y";
-    mapping[ASETNIOP_E | ASETNIOP_I] = ",";
-    mapping[ASETNIOP_E | ASETNIOP_O] = "-";
-    mapping[ASETNIOP_E | ASETNIOP_P] = "'";
+void init_numbers_layer()
+{
+    for(int i = 0; i <= MAX_KEY_CODE; i++)
+    {
+        numbers_layer[i] = NO_MAPPING;
+    }
 
-    mapping[ASETNIOP_T | ASETNIOP_N] = "b";
-    mapping[ASETNIOP_T | ASETNIOP_I] = "v";
-    mapping[ASETNIOP_T | ASETNIOP_O] = "g";
-    mapping[ASETNIOP_T | ASETNIOP_P] = "\x08"; // backspace
+    numbers_layer[KEY_A] = KEY_1;
+    numbers_layer[KEY_S] = KEY_2;
+    numbers_layer[KEY_D] = KEY_3;
+    numbers_layer[KEY_F] = KEY_4;
+    numbers_layer[KEY_G] = KEY_5;
+    numbers_layer[KEY_H] = KEY_6;
+    numbers_layer[KEY_J] = KEY_7;
+    numbers_layer[KEY_K] = KEY_8;
+    numbers_layer[KEY_L] = KEY_9;
+    numbers_layer[KEY_SEMICOLON] = KEY_0;
 
-    mapping[ASETNIOP_N | ASETNIOP_I] = "h";
-    mapping[ASETNIOP_N | ASETNIOP_O] = "u";
-    mapping[ASETNIOP_N | ASETNIOP_P] = "m";
-
-    mapping[ASETNIOP_I | ASETNIOP_O] = "l";
-    mapping[ASETNIOP_I | ASETNIOP_P] = "k";
-
-    mapping[ASETNIOP_O | ASETNIOP_P] = ";";
-
-    // with shift
-    mapping[ASETNIOP_SHIFT | ASETNIOP_A] = "A";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_S] = "S";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_E] = "E";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_T] = "T";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_N] = "N";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_I] = "I";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_O] = "O";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_P] = "P";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_SPACE] = "\n";
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_S] = "W";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_E] = "X";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_T] = "F";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_N] = "Q";
-    // mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_I] = "!";
-    // mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_O] = "(";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_A | ASETNIOP_P] = "/";
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_E] = "D";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_T] = "C";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_N] = "J";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_I] = "Z";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_O] = ">";
-    // mapping[ASETNIOP_SHIFT | ASETNIOP_S | ASETNIOP_P] = ")";
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_T] = "R";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_N] = "Y";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_I] = "<";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_O] = "_";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_E | ASETNIOP_P] = "\"";
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_T | ASETNIOP_N] = "B";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_T | ASETNIOP_I] = "V";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_T | ASETNIOP_O] = "G";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_T | ASETNIOP_P] = "\x08"; // backspace
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_I] = "H";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_O] = "U";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_N | ASETNIOP_P] = "M";
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_I | ASETNIOP_O] = "L";
-    mapping[ASETNIOP_SHIFT | ASETNIOP_I | ASETNIOP_P] = "K";
-
-    mapping[ASETNIOP_SHIFT | ASETNIOP_O | ASETNIOP_P] = ":";
+    numbers_layer[KEY_Q] = KEY_1 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_W] = KEY_2 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_E] = KEY_3 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_R] = KEY_4 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_T] = KEY_5 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_Y] = KEY_6 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_U] = KEY_7 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_I] = KEY_8 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_O] = KEY_9 + KEY_SHIFT_MASK;
+    numbers_layer[KEY_P] = KEY_0 + KEY_SHIFT_MASK;
 }
 
 char* create_output_mapping(char code)
@@ -296,130 +149,15 @@ char* create_output_mapping2(char code1, char code2)
   return result;
 }
 
-void init_output_mapping()
-{
-#ifdef KEYS_EXTENSION
-  output_mapping[HEXIFY(CODE_KEY_UP)] = create_output_mapping(KEY_UP);
-  output_mapping[HEXIFY(CODE_KEY_DOWN)] = create_output_mapping(KEY_DOWN);
-  output_mapping[HEXIFY(CODE_KEY_LEFT)] = create_output_mapping(KEY_LEFT);
-  output_mapping[HEXIFY(CODE_KEY_RIGHT)] = create_output_mapping(KEY_RIGHT);
-  output_mapping[HEXIFY(CODE_KEY_PAGE_UP)] = create_output_mapping(KEY_PAGEUP);
-  output_mapping[HEXIFY(CODE_KEY_PAGE_DOWN)] = create_output_mapping(KEY_PAGEDOWN);
-  output_mapping[HEXIFY(CODE_KEY_HOME)] = create_output_mapping(KEY_HOME);
-  output_mapping[HEXIFY(CODE_KEY_END)] = create_output_mapping(KEY_END);
-
-  output_mapping['\t'] = create_output_mapping(KEY_TAB);
-  output_mapping['\x1b'] = create_output_mapping(KEY_ESC);
-#endif
-
-#ifdef PL_EXTENSION
-  output_mapping[HEXIFY(CODE_KEY_PL_A)] = create_output_mapping2(KEY_RIGHTALT, KEY_A);
-  output_mapping[HEXIFY(CODE_KEY_PL_C)] = create_output_mapping2(KEY_RIGHTALT, KEY_C);
-  output_mapping[HEXIFY(CODE_KEY_PL_E)] = create_output_mapping2(KEY_RIGHTALT, KEY_E);
-  output_mapping[HEXIFY(CODE_KEY_PL_L)] = create_output_mapping2(KEY_RIGHTALT, KEY_L);
-  output_mapping[HEXIFY(CODE_KEY_PL_N)] = create_output_mapping2(KEY_RIGHTALT, KEY_N);
-  output_mapping[HEXIFY(CODE_KEY_PL_O)] = create_output_mapping2(KEY_RIGHTALT, KEY_O);
-  output_mapping[HEXIFY(CODE_KEY_PL_S)] = create_output_mapping2(KEY_RIGHTALT, KEY_S);
-  output_mapping[HEXIFY(CODE_KEY_PL_X)] = create_output_mapping2(KEY_RIGHTALT, KEY_X);
-  output_mapping[HEXIFY(CODE_KEY_PL_Z)] = create_output_mapping2(KEY_RIGHTALT, KEY_Z);
-#endif
-
-  output_mapping['a'] = create_output_mapping(KEY_A);
-  output_mapping['b'] = create_output_mapping(KEY_B);
-  output_mapping['c'] = create_output_mapping(KEY_C);
-  output_mapping['d'] = create_output_mapping(KEY_D);
-  output_mapping['e'] = create_output_mapping(KEY_E);
-  output_mapping['f'] = create_output_mapping(KEY_F);
-  output_mapping['g'] = create_output_mapping(KEY_G);
-  output_mapping['h'] = create_output_mapping(KEY_H);
-  output_mapping['i'] = create_output_mapping(KEY_I);
-  output_mapping['j'] = create_output_mapping(KEY_J);
-  output_mapping['k'] = create_output_mapping(KEY_K);
-  output_mapping['l'] = create_output_mapping(KEY_L);
-  output_mapping['m'] = create_output_mapping(KEY_M);
-  output_mapping['n'] = create_output_mapping(KEY_N);
-  output_mapping['o'] = create_output_mapping(KEY_O);
-  output_mapping['p'] = create_output_mapping(KEY_P);
-  output_mapping['q'] = create_output_mapping(KEY_Q);
-  output_mapping['r'] = create_output_mapping(KEY_R);
-  output_mapping['s'] = create_output_mapping(KEY_S);
-  output_mapping['t'] = create_output_mapping(KEY_T);
-  output_mapping['u'] = create_output_mapping(KEY_U);
-  output_mapping['w'] = create_output_mapping(KEY_W);
-  output_mapping['v'] = create_output_mapping(KEY_V);
-  output_mapping['x'] = create_output_mapping(KEY_X);
-  output_mapping['y'] = create_output_mapping(KEY_Y);
-  output_mapping['z'] = create_output_mapping(KEY_Z);
-
-  char i;
-  for (i = 'a'; i <= 'z'; i++)
-  {
-    output_mapping[toupper(i)] = create_output_mapping2(KEY_LEFTSHIFT, output_mapping[i][1]);
-  }
-
-  output_mapping[';'] = create_output_mapping(KEY_SEMICOLON);
-  output_mapping['.'] = create_output_mapping(KEY_DOT);
-  output_mapping[','] = create_output_mapping(KEY_COMMA);
-  output_mapping['-'] = create_output_mapping(KEY_MINUS);
-  output_mapping['/'] = create_output_mapping(KEY_SLASH);
-  output_mapping['\''] = create_output_mapping(KEY_APOSTROPHE);
-  output_mapping['\\'] = create_output_mapping(KEY_BACKSLASH);
-
-  output_mapping['|']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_BACKSLASH);
-  output_mapping['\"'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_APOSTROPHE);
-  output_mapping['?']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_SLASH);
-  output_mapping['!']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_1);
-  output_mapping['(']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_9);
-  output_mapping[')']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_0);
-  output_mapping['<']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_COMMA);
-  output_mapping['>']  = create_output_mapping2(KEY_LEFTSHIFT, KEY_DOT);
-
-  output_mapping['\x08'] = create_output_mapping(KEY_BACKSPACE);
-  output_mapping[' '] = create_output_mapping(KEY_SPACE);
-  output_mapping['\n'] = create_output_mapping(KEY_ENTER);
-
-  output_mapping['1'] = create_output_mapping(KEY_1);
-  output_mapping['2'] = create_output_mapping(KEY_2);
-  output_mapping['3'] = create_output_mapping(KEY_3);
-  output_mapping['4'] = create_output_mapping(KEY_4);
-  output_mapping['5'] = create_output_mapping(KEY_5);
-  output_mapping['6'] = create_output_mapping(KEY_6);
-  output_mapping['7'] = create_output_mapping(KEY_7);
-  output_mapping['8'] = create_output_mapping(KEY_8);
-  output_mapping['9'] = create_output_mapping(KEY_9);
-  output_mapping['0'] = create_output_mapping(KEY_0);
-
-  output_mapping['`'] = create_output_mapping(KEY_GRAVE);
-  output_mapping['~'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_GRAVE);
-
-  output_mapping['['] = create_output_mapping(KEY_LEFTBRACE);
-  output_mapping[']'] = create_output_mapping(KEY_RIGHTBRACE);
-
-  output_mapping['{'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_LEFTBRACE);
-  output_mapping['}'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_RIGHTBRACE);
-  output_mapping['='] = create_output_mapping(KEY_EQUAL);
-  output_mapping['+'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_EQUAL);
-  output_mapping['_'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_MINUS);
-  output_mapping[':'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_SEMICOLON);
-
-  output_mapping['@'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_2);
-  output_mapping['#'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_3);
-  output_mapping['$'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_4);
-  output_mapping['%'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_5);
-  output_mapping['^'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_6);
-  output_mapping['&'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_7);
-  output_mapping['*'] = create_output_mapping2(KEY_LEFTSHIFT, KEY_8);
-}
-
 static int change_grab(long operation)
 {
     int result = ioctl(input_descriptor, EVIOCGRAB, (void*)operation);
     if (result == -1)
     {
-        printf("Couldn't %s input from device %s: %s\n", operation ? "grab" : "ungrab", input_dev, strerror(errno));
+        warning("Couldn't %s input from device %s: %s\n", operation ? "grab" : "ungrab", input_dev, strerror(errno));
         return EXIT_FAILURE;
     }
-    printf("Input %s successfully\n", operation ? "grabbed" : "ungrabbed");
+    debug("Input %s successfully\n", operation ? "grabbed" : "ungrabbed");
     return EXIT_SUCCESS;
 }
 
@@ -438,7 +176,7 @@ int open_input()
     input_descriptor = open(input_dev, O_RDONLY);
     if (input_descriptor == -1)
     {
-        printf("Couldn't open input device %s: %s\n", input_dev, strerror(errno));
+        warning("Couldn't open input device %s: %s\n", input_dev, strerror(errno));
         return EXIT_FAILURE;
     }
 
@@ -450,21 +188,21 @@ int open_output()
     output_descriptor = open(output_dev, O_WRONLY);
     if (output_descriptor == -1)
     {
-        printf("Couldn't open output device %s: %s\n", output_dev, strerror(errno)); 
+        warning("Couldn't open output device %s: %s\n", output_dev, strerror(errno)); 
         return EXIT_FAILURE;
     }
     
     int ret = ioctl(output_descriptor, UI_SET_EVBIT, EV_KEY);
     if (ret == -1)
     {
-        printf("Couldn't set ioctl: UI_SET_EVBIT EV_KEY\n"); 
+        warning("Couldn't set ioctl: UI_SET_EVBIT EV_KEY\n"); 
         return EXIT_FAILURE;
     }
  
     ret = ioctl(output_descriptor, UI_SET_EVBIT, EV_SYN);
     if (ret == -1)
     {
-        printf("Couldn't set ioctl: UI_SET_EVBIT EV_SYN\n"); 
+        warning("Couldn't set ioctl: UI_SET_EVBIT EV_SYN\n"); 
         return EXIT_FAILURE;
     }
 
@@ -474,7 +212,7 @@ int open_output()
       ret = ioctl(output_descriptor, UI_SET_KEYBIT, i);
       if (ret == -1)
       {
-          printf("Couldn't set ioctl UI_SET_KEYBIT for key %d: %s\n", i, strerror(errno)); 
+          warning("Couldn't set ioctl UI_SET_KEYBIT for key %d: %s\n", i, strerror(errno)); 
           return EXIT_FAILURE;
       }
     }
@@ -491,19 +229,21 @@ int open_output()
     ret = write(output_descriptor, &uidev, sizeof(uidev));
     if (ret == -1)
     {
-        printf("Couldn't write uinput device descriptor: %s\n", strerror(errno)); 
+        warning("Couldn't write uinput device descriptor: %s\n", strerror(errno)); 
         return EXIT_FAILURE;
     }
 
     ret = ioctl(output_descriptor, UI_DEV_CREATE);
     if (ret == -1)
     {
-        printf("Couldn't create uinput device: %s\n", strerror(errno)); 
+        warning("Couldn't create uinput device: %s\n", strerror(errno)); 
         return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
 }
+
+void generate_sync_event();
 
 void generate_key_event(int code, int type)
 {
@@ -517,25 +257,91 @@ void generate_key_event(int code, int type)
     int ret = write(output_descriptor, &ev, sizeof(ev));
     if (ret == -1)
     {
-      printf("Couldn't generate key event %d for %d: %s\n", type, code, strerror(errno)); 
+      warning("Couldn't generate key event %d for %d: %s\n", type, code, strerror(errno)); 
     }
 }
 
 void generate_key_press(int code)
 {
-  printf("Generating key press event for key: %d\n", code);
-  generate_key_event(code, 1);
+    if(pressed_keys_count == MAX_PRESSED_KEYS)
+    {
+        warning("Cannot handle more pressed keys - ignoring %d\n", code);
+        return;
+    }
+    pressed_keys[pressed_keys_count++] = code;
+
+    int raw_code = code & ~(KEY_SHIFT_MASK | KEY_CTRL_MASK);
+    debug("Generating key press event for key: %d (with modifiers: %d)\n", raw_code);
+
+    if((code & KEY_SHIFT_MASK) != 0)
+    {
+        generate_key_event(KEY_LEFTSHIFT, 1);
+    }
+
+    if((code & KEY_CTRL_MASK) != 0)
+    {
+        generate_key_event(KEY_LEFTCTRL, 1);
+    }
+
+    generate_key_event(raw_code, 1);
+
+    generate_sync_event();
 }
 
 void generate_key_release(int code)
 {
-  printf("Generating key release event for key: %d\n", code);
-  generate_key_event(code, 0);
+    if(pressed_keys_count == 0)
+    {
+        warning("This is strange - received key release, but no pressed key is currently registered\n");
+        return;
+    }
+
+    if(code == pressed_keys[pressed_keys_count])
+    {
+        pressed_keys_count--;
+    }
+    else
+    {
+        int i;
+        for(i = 0; i < pressed_keys_count; i++)
+        {
+            if(pressed_keys[i] == code)
+            {
+                break;
+            }
+        }
+
+        if(i == pressed_keys_count)
+        {
+            warning("This is strange - couldn't find this key in registered list: %d\n", code);
+            return;
+        }
+
+        pressed_keys[i] = pressed_keys[pressed_keys_count - 1];
+        pressed_keys_count--;
+    }
+
+    int raw_code = code & ~(KEY_SHIFT_MASK | KEY_CTRL_MASK);
+    debug("Generating key release event for key: %d (with modifiers: %d)\n", raw_code, code);
+
+    generate_key_event(raw_code, 0);
+
+    if((code & KEY_SHIFT_MASK) != 0)
+    {
+        generate_key_event(KEY_LEFTSHIFT, 0);
+    }
+
+    if((code & KEY_CTRL_MASK) != 0)
+    {
+        generate_key_event(KEY_LEFTCTRL, 0);
+    }
+
+    generate_sync_event();
 }
 
 void generate_sync_event()
 { 
-  printf("Generating sync event\n");
+  debug("Generating sync event\n");
 
   struct input_event ev;
   memset(&ev, 0, sizeof(ev));
@@ -547,222 +353,150 @@ void generate_sync_event()
   int ret = write(output_descriptor, &ev, sizeof(ev));
   if (ret == -1)
   {
-    printf("Couldn't generate SYN event: %s\n", strerror(errno)); 
+    warning("Couldn't generate SYN event: %s\n", strerror(errno)); 
   }
 }
 
-int key_to_asetniop(int code)
+int translate_code(int code)
 {
-  switch(code)
-  {
-    case KEY_A:
-    case KEY_Q:
-      return ASETNIOP_A;
-    case KEY_S:
-    case KEY_W:
-      return ASETNIOP_S;
-    case KEY_D:
-    case KEY_E:
-      return ASETNIOP_E;
-    case KEY_R:
-    case KEY_F:
-      return ASETNIOP_T;
-    case KEY_J:
-    case KEY_U:
-      return ASETNIOP_N;
-    case KEY_K:
-    case KEY_I:
-      return ASETNIOP_I;
-    case KEY_L:
-    case KEY_O:
-      return ASETNIOP_O;
-    case KEY_P:
-    case KEY_SEMICOLON:
-      return ASETNIOP_P;
-    case KEY_SPACE:
-      return ASETNIOP_SPACE;
-    case KEY_LEFTALT:
-    case KEY_Z:
-    case KEY_X:
-    case KEY_C:
-    case KEY_V:
-#ifdef ALT_EXTENSION
-      return ASETNIOP_ALT;
-#endif
-    case KEY_N:
-    case KEY_M:
-    case KEY_COMMA:
-    case KEY_DOT:
-    case KEY_SLASH:
-    case KEY_RIGHTALT:
-      return ASETNIOP_SHIFT;
-  }
+    chord_generated = TRUE;
 
-  return -1;
+    if(mode == MODE_PASSTHROUGH)
+    {
+        return code;
+    }
+
+    if(code > MAX_KEY_CODE)
+    {
+        return code;
+    }
+
+    int result;
+
+    if(space_pressed == TRUE)
+    {
+        result = numbers_layer[code];
+    }
+    else
+    {
+        result = default_layer[code];
+    }
+
+    if(capslock_pressed)
+    {
+        result += KEY_CTRL_MASK;
+    }
+    return result;
 }
 
 int handle_key_press(int code)
 {
-  printf("Key Pressed: %d, current state is: %d\n", code, state);
-  if (!operational_mode)
+  debug("Key Pressed: %d, current state is: %d\n", code, state);
+
+  if(code == KEY_RIGHTMETA)
   {
-    printf("Not in operational mode, ignoring...\n");
-    return EXIT_SUCCESS;
+      info("Detected exit key (RIGHT META) press, exiting.\n");
+      return EXIT_FAILURE;
   }
 
-  if (code == KEY_RIGHTMETA || code == KEY_BACKSPACE)
+  if(code == KEY_SCROLLLOCK)
   {
-      printf("Detected exit key press, exiting.\n");
-      return 1;
-  }
-
-  int key = key_to_asetniop(code);
-  if (key == -1)
-  {
-    printf("Non-asetniop key pressed, ignoring...\n");
-    return 0;
-  }
-  else if (key == ASETNIOP_SHIFT)
-  {
-    if (state == 0)
-    {
-      printf("Sticky shift set\n");
-      sticky_shift = SET;
-      return EXIT_SUCCESS;
-    }
-  }
-#ifdef ALT_EXTENSION
-  else if (key == ASETNIOP_ALT)
-  {
-    if (state == 0)
-    {
-      printf("Sticky alt set\n");
-      sticky_alt = SET;
-      return EXIT_SUCCESS;
-    }
-  }
-#endif
-  else
-  {
-    if (sticky_shift == SET)
-    {
-      printf("Using sticky shift modifier and reseting it\n");
-      state |= ASETNIOP_SHIFT;
-      sticky_shift = USED;
-    }
-#ifdef ALT_EXTENSION
-    if (sticky_alt == SET)
-    {
-      printf("Using sticky alt modifier and resetting it\n");
-      sticky_alt = USED;
-    }
-#endif
-  }
-
-  state |= key;
-  if (state == (ASETNIOP_A | ASETNIOP_T | ASETNIOP_N | ASETNIOP_P))
-  {
-      printf("Detected 'devils horn'\n");
-      if (current_mapping == mapping)
+      if(mode == MODE_PASSTHROUGH)
       {
-          printf("Layout changed to: symbols\n");
-          current_mapping = symbols_mapping;
+          info("Switching mode to NORMAL\n");
+          mode = MODE_NORMAL;
+      }
+      else if(mode == MODE_NORMAL)
+      {
+          info("Switching mode to PASSTHROUGH\n");
+          mode = MODE_PASSTHROUGH;
       }
       else
       {
-          printf("Layout changed to: letters\n");
-          current_mapping = mapping;
+          error("Unsupported mode: 0x%x\n", mode);
+          return EXIT_FAILURE;
       }
-      mask = 0;
-
-      return 0;
+  }
+  
+  if(code == KEY_SPACE && pressed_keys_count == 0)
+  {
+      // this one can work as a chord leader key
+      space_pressed = TRUE;
+      chord_generated = FALSE;
+      return EXIT_SUCCESS;
   }
 
-  mask = state;
-  printf("State changed to: %d\n", state);
-  return 0;
+  if(code == KEY_CAPSLOCK)
+  {
+      capslock_pressed = TRUE;
+      chord_generated = FALSE;
+      return EXIT_SUCCESS;
+  }
+
+  int translated_code = translate_code(code);
+  if(translated_code == NO_MAPPING)
+  {
+      debug("Ignoring key press\n");
+      return EXIT_SUCCESS;
+  }
+
+  generate_key_press(translated_code);
+  return EXIT_SUCCESS;
 }
 
-void generate_chord()
+void release_all_pressed_keys()
 {
-  char* m;
-#ifdef ALT_EXTENSION
-  if (sticky_alt == USED)
-  {
-    sticky_alt = NOT_SET;
-    m = symbols_mapping[state & mask];
-  }
-  else
-  {
-    m = current_mapping[state & mask];
-  }
-#else
-  m = current_mapping[state & mask];
-#endif
-  if (m == 0)
-  {
-      printf("Unknown mapping, ignoring...\n");
-      return;
-  }
-
-  printf("Mapping for currents state %d (mask %d) is '%s'\n", state, mask, m);
-  while (*m)
-  {
-    char key_count = output_mapping[*m][0];
-    printf("This would generate %d key presses\n", key_count);
-    int i;
-    for (i = 1; i <= key_count; i++)
+    for(int i = pressed_keys_count - 1; i >= 0; i--)
     {
-      generate_key_press(output_mapping[*m][i]);
+      generate_key_release(pressed_keys[i]);
     }
-    for (i = key_count; i > 0; i--)
-    {
-      generate_key_release(output_mapping[*m][i]);
-    }
-    generate_sync_event();
-
-    m++;
-  }
 }
 
 void handle_key_release(int code)
 {
-  printf("Key Released: %d\n", code);
-  if (code == KEY_SCROLLLOCK)
+  debug("Key Released: %d\n", code);
+
+  if(code == KEY_SPACE)
   {
-      operational_mode = 1 - operational_mode;
-      state = 0;
-      mask = 0;
-      if (operational_mode)
+      if(chord_generated == FALSE)
       {
-          grab_input();
+        space_pressed = FALSE;
+        generate_key_press(KEY_SPACE);
+        generate_key_release(KEY_SPACE);
       }
       else
       {
-          release_input();
+          // release all currently presed keys
+          // before clearing the space_pressed flag
+          release_all_pressed_keys();
+          space_pressed = FALSE;
       }
       return;
   }
 
-  if ((state & mask) != 0)
+  if(code == KEY_CAPSLOCK)
   {
-    generate_chord();
+    if(chord_generated == FALSE)
+    {
+        capslock_pressed = FALSE;
+        generate_key_press(KEY_ESC);
+        generate_key_release(KEY_ESC);
+    }
+    else
+    {
+        release_all_pressed_keys();
+        capslock_pressed = FALSE;
+    }
   }
 
-  int key = key_to_asetniop(code);
-  if (key != -1)
+  int translated_code = translate_code(code);
+  if(translated_code == NO_MAPPING)
   {
-      state &= (~key);
+      debug("Ignoring key release\n");
+      return;
   }
- 
-  if (sticky_shift == USED)
-  { 
-    sticky_shift = NOT_SET;
-    state &= ~ASETNIOP_SHIFT;
-  } 
 
-  printf("State after releasing key is: %d\n", state);
-  mask = 0;
+  generate_key_release(translated_code);
 }
 
 void loop()
@@ -789,13 +523,13 @@ void loop()
         break;
     }
 
-    // printf("Keyboard event: type %d, value %d, code %d\n", ev.type, ev.value, ev.code);
+    noisy("Keyboard event: type %d, value %d, code %d\n", ev.type, ev.value, ev.code);
     if (ev.type == EV_KEY)
     {
       if (ev.value == 2)
       {
         // autorepeat
-        generate_chord();
+        // generate_chord();
       }
       else if (ev.value == 1)
       {
@@ -814,14 +548,19 @@ void loop()
 
 int main()
 {
-  init_standard_mapping();
-  init_symbols_mapping();
-  init_output_mapping();
+    info("KB mapper started in the PASSTHROUGH mode\n");
+    // to avoid catching the enter key
+    sleep(3);
 
-  current_mapping = mapping;
+    mode = MODE_PASSTHROUGH;
 
-  open_input();
-  open_output();
-  loop();
-  return 0;
+    init_default_layer();
+    init_numbers_layer();
+
+    current_mapping = mapping;
+
+    open_input();
+    open_output();
+    loop();
+    return 0;
 }
